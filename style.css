@@ -303,7 +303,17 @@ html, body {
   display: none;
 }
 
+.copyright-note {
+  font-size: 12px;
+  color: #7a7a7a;
+  margin-top: 6px;
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+
+/* --- Responsive mobile --- */
 @media (max-width: 900px) {
+
   #app {
     position: relative;
     display: block;
@@ -365,11 +375,5 @@ html, body {
     font-weight: 700;
     cursor: pointer;
   }
-  .copyright-note {
-  font-size: 12px;
-  color: #7a7a7a;
-  margin-top: 6px;
-  margin-bottom: 14px;
-  line-height: 1.4;
-}
+
 }
