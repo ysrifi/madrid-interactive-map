@@ -1,0 +1,368 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: Arial, sans-serif;
+  background: #f6f4ef;
+}
+
+#app {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+}
+
+#sidebar {
+  width: 360px;
+  min-width: 320px;
+  max-width: 380px;
+  background: #fffdf9;
+  border-right: 1px solid #e3ddd2;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.06);
+  z-index: 1000;
+}
+
+.sidebar-header {
+  padding: 20px 18px 12px;
+  border-bottom: 1px solid #eee5d8;
+}
+
+.sidebar-header h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.sidebar-header p {
+  margin: 0;
+  color: #6f675b;
+  font-size: 14px;
+}
+
+.search-box,
+.layer-section,
+.results-panel {
+  padding: 16px 18px;
+  border-bottom: 1px solid #eee5d8;
+}
+
+.search-box label,
+.layer-section h2,
+.results-panel h2 {
+  display: block;
+  margin: 0 0 10px;
+  font-size: 16px;
+  color: #2f2a24;
+}
+
+.search-row {
+  display: flex;
+  gap: 8px;
+}
+
+#searchInput {
+  flex: 1;
+  padding: 11px 12px;
+  border: 1px solid #d8d0c3;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+#searchBtn,
+.sidebar-actions button {
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #b85c2e;
+  color: white;
+  font-weight: 600;
+}
+
+.search-box small {
+  display: block;
+  margin-top: 8px;
+  color: #7c7266;
+}
+
+.layer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  color: #2f2a24;
+}
+
+.layer-toggle.places { background: rgba(204,102,0,0.12); }
+.layer-toggle.monuments { background: rgba(106,27,154,0.12); }
+.layer-toggle.musees { background: rgba(0,102,204,0.12); }
+.layer-toggle.parcs { background: rgba(46,125,50,0.12); }
+.layer-toggle.activites { background: rgba(121,85,72,0.12); }
+.layer-toggle.shopping { background: rgba(97,97,97,0.12); }
+.layer-toggle.stations { background: rgba(198,40,40,0.10); }
+
+.sidebar-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+#map-wrap {
+  flex: 1;
+  position: relative;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+.results-panel p,
+.results-panel li {
+  font-size: 14px;
+  line-height: 1.45;
+  color: #3a352e;
+}
+
+.result-block {
+  background: #faf7f2;
+  border: 1px solid #e8dfd2;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.result-block h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.poi-list {
+  padding-left: 18px;
+  margin: 8px 0 0;
+}
+
+.custom-metro-point {
+  width: 8px;
+  height: 8px;
+  background: #c62828;
+  border-radius: 50%;
+  border: 1px solid white;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+}
+
+.metro-logo {
+  width: 26px;
+  height: 18px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.metro-logo {
+  position: relative;
+  width: 34px;
+  height: 18px;
+}
+
+.metro-logo::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 1px;
+  width: 14px;
+  height: 14px;
+  background: white;
+  border: 3px solid #c62828;
+  transform: rotate(45deg);
+  box-sizing: border-box;
+  z-index: 1;
+}
+
+.metro-logo::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  width: 30px;
+  height: 6px;
+  background: #1565c0;
+  border-radius: 2px;
+  z-index: 2;
+}
+
+.poi-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 7px rgba(0,0,0,0.25);
+  border: 2px solid white;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.poi-emoji-icon {
+  background: white;
+}
+
+.poi-places { background: #cc6600; }
+.poi-monuments { background: #6a1b9a; }
+.poi-musees { background: #0066cc; }
+.poi-parcs { background: #2e7d32; }
+.poi-activites { background: #795548; }
+.poi-shopping { background: #616161; }
+
+@media (max-width: 900px) {
+  #app {
+    flex-direction: column;
+  }
+
+  #sidebar {
+    width: 100%;
+    max-width: none;
+    min-width: auto;
+    height: 42vh;
+  }
+
+  #map-wrap {
+    height: 58vh;
+  }
+}
+
+.metro-emoji-icon {
+  font-size: 22px;
+  line-height: 1;
+  text-align: center;
+}
+
+.metro-emoji-small {
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.metro-lines-panel {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #eee5d8;
+}
+
+.metro-lines-panel h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.metro-line-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 6px 4px 0;
+}
+
+.metro-chip {
+  display: inline-block;
+  min-width: 38px;
+  text-align: center;
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.metro-L1  { background: #79c7df; }
+.metro-L2  { background: #ef3340; }
+.metro-L3  { background: #ffd100; color: #0b4ea2; }
+.metro-L4  { background: #d17c00; }
+.metro-L5  { background: #a4c614; }
+.metro-L6  { background: #bdb7ad; }
+.metro-L7  { background: #f0a202; }
+.metro-L8  { background: #e7a6c9; }
+.metro-L9  { background: #a639a7; }
+.metro-L10 { background: #0057b8; }
+.metro-L11 { background: #009b3a; }
+.metro-L12 { background: #b5a100; }
+.metro-R { background: #000000; }
+
+#mobileMenuHandle {
+  display: none;
+}
+
+#mobileOverlay {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  #app {
+    position: relative;
+    display: block;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  #map-wrap {
+    height: 100vh;
+  }
+
+  #sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: min(86vw, 360px);
+    height: 100vh;
+    z-index: 2000;
+    transform: translateX(-100%);
+    transition: transform 0.28s ease;
+    box-shadow: 8px 0 24px rgba(0,0,0,0.18);
+    border-right: 1px solid #e3ddd2;
+  }
+
+  #sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  #mobileOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.28);
+    z-index: 1900;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  #mobileOverlay.active {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  #mobileMenuHandle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 2100;
+    border: none;
+    border-radius: 999px;
+    padding: 10px 14px;
+    background: white;
+    color: #2f2a24;
+    box-shadow: 0 3px 14px rgba(0,0,0,0.18);
+    font-weight: 700;
+    cursor: pointer;
+  }
+}
