@@ -413,3 +413,14 @@ html, body {
   width: 100vw;
   height: 100vh;
 }
+
+#app:fullscreen,
+#app:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+}
+
+#app:fullscreen #map-wrap,
+#app:-webkit-full-screen #map-wrap {
+  height: 100%;
+}
