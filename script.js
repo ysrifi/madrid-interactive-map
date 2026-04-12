@@ -1056,13 +1056,13 @@ function setupMobileSidebar() {
 setupMobileSidebar();
 
 const fullscreenMapBtn = document.getElementById("fullscreenMapBtn");
-const mapWrap = document.getElementById("map-wrap");
+const app = document.getElementById("app");
 
-if (fullscreenMapBtn && mapWrap) {
+if (fullscreenMapBtn && app) {
   fullscreenMapBtn.addEventListener("click", async () => {
     try {
       if (!document.fullscreenElement) {
-        await mapWrap.requestFullscreen();
+        await app.requestFullscreen();
       } else {
         await document.exitFullscreen();
       }
