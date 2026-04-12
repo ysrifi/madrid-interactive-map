@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Madrid Interactive Map</title>
 
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
@@ -17,24 +18,114 @@
 
 <body>
 
-<button id="mobileMenuHandle" aria-label="Ouvrir le menu">☰ Menu</button>
-<div id="mobileOverlay"></div>
+  <button id="mobileMenuHandle" type="button" aria-label="Ouvrir le menu">☰ Menu</button>
+  <div id="mobileOverlay"></div>
 
-<div id="app">
-  <aside id="sidebar">
-    <div class="sidebar-header">
-      <h1>Madrid Interactive Map</h1>
-<p>Optimisez votre exploration de Madrid</p>
-<div class="copyright-note">© Younes Srifi — Tous droits réservés</div>
-    </div>
+  <div id="app">
+    <aside id="sidebar">
+      <div class="sidebar-header">
+        <h1>Madrid Interactive Map</h1>
+        <p>Optimisez votre exploration de Madrid</p>
+        <div class="copyright-note">© Younes Srifi — Tous droits réservés</div>
+      </div>
 
-    <div class="search-box">
-      <label for="searchInput">Votre hébergement à Madrid</label>
-      <div class="search-row">
-        <input
-          id="searchInput"
-          type="text"
-          placeholder="Nom de l’hôtel ou adresse complète"
+      <div class="search-box">
+        <label for="searchInput">Votre hébergement à Madrid</label>
+        <div class="search-row">
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="Nom de l’hôtel ou adresse complète"
+          />
+          <button id="searchBtn" type="button">Rechercher</button>
+        </div>
+        <small>Ex. : Hotel Regina Madrid ou adresse complète</small>
+      </div>
+
+      <div class="layer-section">
+        <h2>Catégories</h2>
+
+        <label class="layer-toggle places">
+          <input type="checkbox" data-layer="places" />
+          <span>🌟 Places</span>
+        </label>
+
+        <label class="layer-toggle monuments">
+          <input type="checkbox" data-layer="monuments" />
+          <span>🏰 Monuments</span>
+        </label>
+
+        <label class="layer-toggle musees">
+          <input type="checkbox" data-layer="musees" />
+          <span>🏛️ Musées</span>
+        </label>
+
+        <label class="layer-toggle parcs">
+          <input type="checkbox" data-layer="parcs" />
+          <span>🌳 Parcs</span>
+        </label>
+
+        <label class="layer-toggle activites">
+          <input type="checkbox" data-layer="activites" />
+          <span>🎯 Activités</span>
+        </label>
+
+        <label class="layer-toggle shopping">
+          <input type="checkbox" data-layer="shopping" />
+          <span>🛍️ Shopping</span>
+        </label>
+
+        <label class="layer-toggle stations">
+          <input type="checkbox" data-layer="stations" checked />
+          <span>🚇 Stations de métro</span>
+        </label>
+
+        <div class="metro-lines-panel">
+          <h3>🚇 Lignes de métro</h3>
+
+          <label class="metro-line-toggle"><input type="checkbox" data-metro-line="L1"> <span class="metro-chip metro-L1">L1</span></label>
+          <label class="metro-line-toggle"><input type="checkbox" data-metro-line="L2"> <span class="metro-chip metro-L2">L2</span></label>
+          <label class="metro-line-toggle"><input type="checkbox" data-metro-line="L3"> <span class="metro-chip metro-L3">L3</span></label>
+          <label class="metro-line-toggle"><input type="checkbox" data-metro-line="L4"> <span class="metro-chip metro-L4">L4</span></label>
+          <label class="metro-line-toggle"><input type="checkbox" data-metro-line="L5"> <span class="metro-chip metro-L5">L5</span></label>
+          <label class="metro-line-toggle"><input type="checkbox" data-metro-line="L6"> <span class="metro-chip metro-L6">L6</span></label>
+          <label class="metro-line-toggle"><input type="checkbox" data-metro-line="L7"> <span class="metro-chip metro-L7">L7</span></label>
+          <label class="metro-line-toggle"><input type="checkbox" data-metro-line="L8"> <span class="metro-chip metro-L8">L8</span></label>
+          <label class="metro-line-toggle"><input type="checkbox" data-metro-line="L9"> <span class="metro-chip metro-L9">L9</span></label>
+          <label class="metro-line-toggle"><input type="checkbox" data-metro-line="L10"> <span class="metro-chip metro-L10">L10</span></label>
+          <label class="metro-line-toggle"><input type="checkbox" data-metro-line="L11"> <span class="metro-chip metro-L11">L11</span></label>
+          <label class="metro-line-toggle"><input type="checkbox" data-metro-line="L12"> <span class="metro-chip metro-L12">L12</span></label>
+          <label class="metro-line-toggle"><input type="checkbox" data-metro-line="R"> <span class="metro-chip metro-R">R</span></label>
+        </div>
+
+        <div class="sidebar-actions">
+          <button id="showAllBtn" type="button">Tout afficher</button>
+          <button id="hideAllBtn" type="button">Tout masquer</button>
+          <button id="clearLinesBtn" type="button">Effacer les lignes</button>
+          <button id="resetMapBtn" type="button">Réinitialiser</button>
+        </div>
+      </div>
+
+      <div id="resultsPanel" class="results-panel">
+        <h2>Résultats</h2>
+        <div id="resultsContent">
+          <p>Recherchez un hébergement ou utilisez la géolocalisation.</p>
+        </div>
+      </div>
+    </aside>
+
+    <main id="map-wrap">
+      <div id="map"></div>
+    </main>
+  </div>
+
+  <div class="map-footer-note">
+    © Madrid Interactive Map — All rights reserved
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>          placeholder="Nom de l’hôtel ou adresse complète"
         />
         <button id="searchBtn">Rechercher</button>
       </div>
