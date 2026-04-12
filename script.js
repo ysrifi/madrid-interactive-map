@@ -1054,3 +1054,30 @@ function setupMobileSidebar() {
 }
 
 setupMobileSidebar();
+
+const fullscreenMapBtn = document.getElementById("fullscreenMapBtn");
+const mapWrap = document.getElementById("map-wrap");
+
+if (fullscreenMapBtn && mapWrap) {
+  fullscreenMapBtn.addEventListener("click", async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await mapWrap.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      console.error("Erreur plein écran :", error);
+    }
+  });
+
+  document.addEventListener("fullscreenchange", () => {
+    fullscreenMapBtn.textContent = document.fullscreenElement ? "✕" : "⛶";
+
+    setTimeout(() => {
+      if (typeof map !== "undefined" && map.invalidateSize) {
+        map.invalidateSize();
+      }
+    }, 200);
+  });
+}
