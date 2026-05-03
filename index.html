@@ -28,16 +28,16 @@
     </div>
 
     <div class="search-box">
-      <label for="searchInput">Votre hébergement à Madrid</label>
+     <label for="searchInput">Rechercher un lieu à Madrid</label>
       <div class="search-row">
         <input
           id="searchInput"
           type="text"
-          placeholder="Nom de l’hôtel ou adresse complète"
+          placeholder="Nom d’un lieu, monument, hôtel ou adresse"
         />
         <button id="searchBtn">Rechercher</button>
       </div>
-      <small>Ex. : Hotel Regina Madrid ou adresse complète</small>
+      <small>Ex. : Puerta del Sol, Hotel Regina Madrid ou adresse complète</small>
     </div>
     
     <div class="layer-section">
@@ -101,9 +101,14 @@
         <button id="hideAllBtn" type="button">Tout masquer</button>
         <button id="clearLinesBtn" type="button">Effacer les lignes</button>
         <button id="resetMapBtn" type="button">Réinitialiser</button>
+        <button id="createItineraryBtn" type="button">Créer un itinéraire</button>
       </div>
     </div>
-
+<div class="itinerary-panel">
+  <h3>🧭 Mes itinéraires</h3>
+  <div id="itineraryList">
+    <p>Aucun itinéraire créé.</p>
+  </div>
     <div id="resultsPanel" class="results-panel">
       <h2>Résultats</h2>
       <div id="resultsContent">
