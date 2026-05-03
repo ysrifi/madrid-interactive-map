@@ -71,23 +71,24 @@ function createPOIIcon(category, symbolClass) {
   });
 }
 
-function createMetroPointIcon() {
-  return L.divIcon({
-    className: "",
-    html: `<div class="metro-emoji-small">🚇</div>`,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
-    popupAnchor: [0, -8]
-  });
-}
+const METRO_LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/2/22/MetroMadridLogoSimplified.svg?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=original";
 
-function createMetroLogoIcon() {
+function createMetroStationIcon(stationName, showLabel = false) {
+  const labelHtml = showLabel
+    ? `<div class="metro-station-label">${escapeHtml(stationName)}</div>`
+    : "";
+
   return L.divIcon({
     className: "",
-    html: `<div class="metro-emoji-icon">🚇</div>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-    popupAnchor: [0, -10]
+    html: `
+      <div class="metro-station-icon">
+        <img class="metro-station-logo" src="${METRO_LOGO_URL}" alt="Metro Madrid">
+        ${labelHtml}
+      </div>
+    `,
+    iconSize: [22, 22],          // ✅ TOUJOURS FIXE
+    iconAnchor: [11, 11],        // ✅ CENTRÉ SUR LE LOGO
+    popupAnchor: [0, -12]
   });
 }
 
@@ -453,7 +454,7 @@ function createStationsLayer() {
   layers.stations = L.geoJSON(rawData.stations, {
     pointToLayer: (feature, latlng) => {
       const marker = L.marker(latlng, {
-        icon: createMetroPointIcon()
+       icon: createMetroStationIcon(getFeatureTitle(feature), false)
       });
 
       const stationTitle = getFeatureTitle(feature);
@@ -482,11 +483,18 @@ function createStationsLayer() {
 function updateStationStyleByZoom() {
   if (!layers.stations) return;
 
-  const useLogo = map.getZoom() >= STATION_ICON_SWITCH_ZOOM;
+  const zoom = map.getZoom();
 
   layers.stations.eachLayer(layer => {
-    if (layer.setIcon) {
-      layer.setIcon(useLogo ? createMetroLogoIcon() : createMetroPointIcon());
+    if (!layer.feature || !layer.setIcon) return;
+
+    const stationName = getFeatureTitle(layer.feature);
+
+    if (zoom < 15) {
+      layer.setIcon(createMetroPointIcon());
+    } else {
+      const showLabel = zoom >= 16;
+      layer.setIcon(createMetroStationIcon(stationName, showLabel));
     }
   });
 }
@@ -1079,5 +1087,15 @@ if (fullscreenMapBtn && app) {
         map.invalidateSize();
       }
     }, 200);
+  });
+}
+
+function createMetroPointIcon() {
+  return L.divIcon({
+    className: "",
+    html: `<div class="custom-metro-point"></div>`,
+    iconSize: [8, 8],
+    iconAnchor: [4, 4],
+    popupAnchor: [0, -6]
   });
 }
