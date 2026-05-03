@@ -158,8 +158,8 @@ html, body {
 }
 
 .custom-metro-point {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   background: #c62828;
   border-radius: 50%;
   border: 1px solid white;
@@ -423,4 +423,43 @@ html, body {
 #app:fullscreen #map-wrap,
 #app:-webkit-full-screen #map-wrap {
   height: 100%;
+}
+
+.metro-station-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.metro-station-logo {
+  width: 18px;
+  height: auto;
+  display: block;
+}
+
+.metro-station-label {
+  margin-top: 2px;
+  padding: 1px 5px;
+  background: rgba(255,255,255,0.9);
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #222;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+
+.metro-station-icon {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.metro-station-label {
+  position: absolute;
+  top: 20px; /* sous le logo */
+  left: 50%;
+  transform: translateX(-50%);
 }
