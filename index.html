@@ -1,3 +1,21 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Madrid Interactive Map</title>
+
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- Locate control -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.css" />
+  <script src="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.js"></script>
+</head>
+
+<body>
 <button id="mobileMenuHandle" aria-label="Ouvrir le menu">☰ Menu</button>
 <div id="mobileOverlay"></div>
 
@@ -99,3 +117,10 @@
     <div id="map"></div>
   </main>
 </div>
+<div style="position:fixed; bottom:5px; right:10px; font-size:11px; color:#666;">
+  © Madrid Interactive Map – All rights reserved
+</div>
+<script src="script.js"></script>
+
+</body>
+</html>
