@@ -1,1101 +1,535 @@
-// =========================
-// 1) CONFIGURATION
-// =========================
-const MADRID_CENTER = [40.4168, -3.7038];
-const INITIAL_ZOOM = 12;
-const SEARCH_RADIUS_METERS = 1000;
-const WALKING_SPEED_M_PER_MIN = 80;
-const DISTANCE_CORRECTION_FACTOR = 1.2;
-const STATION_ICON_SWITCH_ZOOM = 14;
-
-const DATA_URLS = {
-  stations: "https://cdn.jsdelivr.net/gh/ysrifi/madrid-map-data@main/stations.geojson",
-  lignes: "https://cdn.jsdelivr.net/gh/ysrifi/madrid-map-data@main/lignes.geojson",
-  places: "https://cdn.jsdelivr.net/gh/ysrifi/madrid-map-data@main/places.geojson",
-  monuments: "https://cdn.jsdelivr.net/gh/ysrifi/madrid-map-data@main/monuments.geojson",
-  musees: "https://cdn.jsdelivr.net/gh/ysrifi/madrid-map-data@main/musees.geojson",
-  parcs: "https://cdn.jsdelivr.net/gh/ysrifi/madrid-map-data@main/parcs.geojson",
-  activites: "https://cdn.jsdelivr.net/gh/ysrifi/madrid-map-data@main/activites.geojson",
-  shopping: "https://cdn.jsdelivr.net/gh/ysrifi/madrid-map-data@main/shopping.geojson"
-};
-
-// =========================
-// 2) CARTE
-// =========================
-const map = L.map("map", {
-  center: MADRID_CENTER,
-  zoom: INITIAL_ZOOM,
-  zoomControl: true
-});
-
-L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-  attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-}).addTo(map);
-
-// =========================
-// 3) CONTROLES
-// =========================
-L.control.locate({
-  position: "topright",
-  flyTo: true,
-  keepCurrentZoomLevel: false,
-  initialZoomLevel: 15,
-  strings: {
-    title: "Me localiser"
-  }
-}).addTo(map);
-
-// =========================
-// 4) VARIABLES GLOBALES
-// =========================
-const layers = {};
-const rawData = {};
-const visibleMetroLines = new Map();
-
-let temporarySearchMarker = null;
-let temporarySearchCircle = null;
-let lastSearchTime = 0;
-const geocodeCache = new Map();
-const manualMetroLines = new Map();
-
-// =========================
-// 5) ICÔNES
-// =========================
-function createPOIIcon(category, symbolClass) {
-  return L.divIcon({
-    className: "",
-    html: `<div class="poi-icon poi-${category}"><i class="${symbolClass}"></i></div>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-    popupAnchor: [0, -12]
-  });
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: Arial, sans-serif;
+  background: #f6f4ef;
 }
 
-const METRO_LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/2/22/MetroMadridLogoSimplified.svg?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=original";
-
-function createMetroStationIcon(stationName, showLabel = false) {
-  const labelHtml = showLabel
-    ? `<div class="metro-station-label">${escapeHtml(stationName)}</div>`
-    : "";
-
-  return L.divIcon({
-    className: "",
-    html: `
-      <div class="metro-station-icon">
-        <img class="metro-station-logo" src="${METRO_LOGO_URL}" alt="Metro Madrid">
-        ${labelHtml}
-      </div>
-    `,
-    iconSize: [22, 22],          // ✅ TOUJOURS FIXE
-    iconAnchor: [11, 11],        // ✅ CENTRÉ SUR LE LOGO
-    popupAnchor: [0, -12]
-  });
+#app {
+  display: flex;
+  height: 100vh;
+  width: 100%;
 }
 
-const categoryIconMap = {
-  places: () => createPOIEmojiIcon("places", "🌟"),
-  monuments: () => createPOIEmojiIcon("monuments", "🏰"),
-  musees: () => createPOIEmojiIcon("musees", "🏛️"),
-  parcs: () => createPOIEmojiIcon("parcs", "🌳"),
-  activites: () => createPOIEmojiIcon("activites", "🎯"),
-  shopping: () => createPOIEmojiIcon("shopping", "🛍️")
-};
-function createPOIEmojiIcon(category, emoji) {
-  return L.divIcon({
-    className: "",
-    html: `<div class="poi-icon poi-${category} poi-emoji-icon">${emoji}</div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
-    popupAnchor: [0, -12]
-  });
-}
-// =========================
-// 6) OUTILS
-// =========================
-function getFeatureTitle(feature) {
-  return feature?.properties?.title ||
-         feature?.properties?.name ||
-         "Sans titre";
+#sidebar {
+  width: 360px;
+  min-width: 320px;
+  max-width: 380px;
+  background: #fffdf9;
+  border-right: 1px solid #e3ddd2;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.06);
+  z-index: 1000;
 }
 
-function getFeatureDescription(feature) {
-  return feature?.properties?.description || "";
+.sidebar-header {
+  padding: 20px 18px 12px;
+  border-bottom: 1px solid #eee5d8;
 }
 
-function getLatLngFromFeature(feature) {
-  const type = feature?.geometry?.type;
-  const coords = feature?.geometry?.coordinates;
-
-  if (!type || !coords) return null;
-
-  if (type === "Point") {
-    return L.latLng(coords[1], coords[0]);
-  }
-
-  if (type === "LineString") {
-    const mid = coords[Math.floor(coords.length / 2)];
-    return L.latLng(mid[1], mid[0]);
-  }
-
-  if (type === "MultiLineString") {
-    const firstLine = coords[0];
-    if (!firstLine || !firstLine.length) return null;
-    const mid = firstLine[Math.floor(firstLine.length / 2)];
-    return L.latLng(mid[1], mid[0]);
-  }
-
-  if (type === "Polygon") {
-    const ring = coords[0];
-    if (!ring || !ring.length) return null;
-    const mid = ring[Math.floor(ring.length / 2)];
-    return L.latLng(mid[1], mid[0]);
-  }
-
-  if (type === "MultiPolygon") {
-    const ring = coords[0]?.[0];
-    if (!ring || !ring.length) return null;
-    const mid = ring[Math.floor(ring.length / 2)];
-    return L.latLng(mid[1], mid[0]);
-  }
-
-  return null;
+.sidebar-header h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  line-height: 1.2;
 }
 
-function haversineDistanceMeters(latlng1, latlng2) {
-  return latlng1.distanceTo(latlng2);
+.sidebar-header p {
+  margin: 0;
+  color: #6f675b;
+  font-size: 14px;
 }
 
-function getEstimatedWalkingDistance(distanceMeters) {
-  return Math.round(distanceMeters * DISTANCE_CORRECTION_FACTOR);
+.copyright-note {
+  font-size: 12px;
+  color: #7a7a7a;
+  margin-top: 6px;
+  margin-bottom: 14px;
+  line-height: 1.4;
 }
 
-function getEstimatedWalkingMinutes(distanceMeters) {
-  const corrected = getEstimatedWalkingDistance(distanceMeters);
-  return Math.max(1, Math.round(corrected / WALKING_SPEED_M_PER_MIN));
+.search-box,
+.layer-section,
+.results-panel {
+  padding: 16px 18px;
+  border-bottom: 1px solid #eee5d8;
 }
 
-function escapeHtml(str) {
-  return String(str || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+.search-box label,
+.layer-section h2,
+.results-panel h2 {
+  display: block;
+  margin: 0 0 10px;
+  font-size: 16px;
+  color: #2f2a24;
 }
 
-function parseStationLines(feature) {
-  const props = feature.properties || {};
-  const raw = (props.lines || props.description || "").toUpperCase();
-
-  if (!raw) return [];
-
-  const matches = raw.match(/L\d+|R/g);
-  return matches ? [...new Set(matches)] : [];
+.search-row {
+  display: flex;
+  gap: 8px;
 }
 
-function getLineColor(lineCode) {
-  const colors = {
-    L1:  "#79c7df",
-    L2:  "#ef3340",
-    L3:  "#ffd100",
-    L4:  "#d17c00",
-    L5:  "#a4c614",
-    L6:  "#bdb7ad",
-    L7:  "#f0a202",
-    L8:  "#e7a6c9",
-    L9:  "#a639a7",
-    L10: "#0057b8",
-    L11: "#009b3a",
-    L12: "#b5a100",
-    R:   "#000000"
-  };
-
-  return colors[lineCode] || "#333333";
+#searchInput {
+  flex: 1;
+  padding: 11px 12px;
+  border: 1px solid #d8d0c3;
+  border-radius: 10px;
+  font-size: 14px;
 }
 
-function getCategoryColor(category) {
-  const colors = {
-    places: "#cc6600",
-    monuments: "#6a1b9a",
-    musees: "#0066cc",
-    parcs: "#2e7d32",
-    activites: "#795548",
-    shopping: "#616161"
-  };
-  return colors[category] || "#333333";
+#searchBtn,
+.sidebar-actions button {
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #b85c2e;
+  color: white;
+  font-weight: 600;
 }
 
-function canSearchNow() {
-  const now = Date.now();
-  if (now - lastSearchTime < 1000) return false;
-  lastSearchTime = now;
-  return true;
+.search-box small {
+  display: block;
+  margin-top: 8px;
+  color: #7c7266;
 }
 
-function clearTemporarySearchGraphics() {
-  if (temporarySearchMarker) {
-    map.removeLayer(temporarySearchMarker);
-    temporarySearchMarker = null;
-  }
-  if (temporarySearchCircle) {
-    map.removeLayer(temporarySearchCircle);
-    temporarySearchCircle = null;
-  }
+.layer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  color: #2f2a24;
 }
 
-function clearMetroLines() {
-  visibleMetroLines.forEach(layer => map.removeLayer(layer));
-  visibleMetroLines.clear();
+.layer-toggle.places { background: rgba(204,102,0,0.12); }
+.layer-toggle.monuments { background: rgba(106,27,154,0.12); }
+.layer-toggle.musees { background: rgba(0,102,204,0.12); }
+.layer-toggle.parcs { background: rgba(46,125,50,0.12); }
+.layer-toggle.activites { background: rgba(121,85,72,0.12); }
+.layer-toggle.shopping { background: rgba(97,97,97,0.12); }
+.layer-toggle.stations { background: rgba(198,40,40,0.10); }
 
-  manualMetroLines.forEach(layer => map.removeLayer(layer));
-  manualMetroLines.clear();
-
-  document.querySelectorAll('input[data-metro-line]').forEach(input => {
-    input.checked = false;
-  });
+.sidebar-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
 }
 
-// =========================
-// 7) POPUPS
-// =========================
-function buildPopup(feature, category) {
-  const props = feature?.properties || {};
-
-  const title = escapeHtml(props.title || props.name || "Sans titre");
-  const desc = escapeHtml(props.description || "");
-  const image = props.image || "";
-  const imageCredit = props.imageCredit || "";
-  const link = props.link || "";
-  const linkLabel = escapeHtml(props.linkLabel || "En savoir plus");
-
-  const imageHtml = image
-    ? `<div style="margin:10px 0;">
-         <img 
-           src="${image}" 
-           alt="${title}" 
-           style="width:100%; max-width:260px; border-radius:10px; display:block; margin:auto;"
-         >
-       </div>`
-    : "";
-
-  const creditHtml = imageCredit
-    ? `<div style="margin-top:4px; font-size:11px; color:#666; line-height:1.3; text-align:center;">
-         ${imageCredit}
-       </div>`
-    : "";
-
-  const descHtml = desc
-    ? `<div style="margin-top:8px; line-height:1.4; text-align:center;">
-         ${desc}
-       </div>`
-    : "";
-
-  const linkHtml = link
-    ? `<div style="margin-top:10px;">
-         <a href="${link}" target="_blank" rel="noopener noreferrer"
-            style="
-              display:inline-block;
-              padding:7px 12px;
-              background:#b85c2e;
-              color:white;
-              text-decoration:none;
-              border-radius:8px;
-              font-size:13px;
-            ">
-           ${linkLabel}
-         </a>
-       </div>`
-    : "";
-
-  return `
-    <div style="min-width:220px; max-width:280px; text-align:center;">
-      <div style="font-weight:700; font-size:15px;">
-        ${title}
-      </div>
-
-      ${imageHtml}
-      ${creditHtml}
-      ${descHtml}
-      ${linkHtml}
-    </div>
-  `;
+#map-wrap {
+  flex: 1;
+  position: relative;
 }
 
-window.zoomToFeature = function(lat, lng) {
-  map.flyTo([lat, lng], 16);
-};
+#map {
+  width: 100%;
+  height: 100%;
+}
 
-// =========================
-// 8) CHARGEMENT DES COUCHES
-// =========================
-async function loadGeoJSON(url) {
-  const finalUrl = `${url}?v=${Date.now()}`;
-  console.log("Chargement :", finalUrl);
+.results-panel p,
+.results-panel li {
+  font-size: 14px;
+  line-height: 1.45;
+  color: #3a352e;
+}
 
-  const response = await fetch(finalUrl, { cache: "no-store" });
-  console.log("Status :", finalUrl, response.status);
+.result-block {
+  background: #faf7f2;
+  border: 1px solid #e8dfd2;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
 
-  if (!response.ok) {
-    throw new Error(`Erreur chargement : ${finalUrl} (${response.status})`);
+.result-block h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.poi-list {
+  padding-left: 18px;
+  margin: 8px 0 0;
+}
+
+.custom-metro-point {
+  width: 6px;
+  height: 6px;
+  background: #c62828;
+  border-radius: 50%;
+  border: 1px solid white;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+}
+
+.metro-logo {
+  width: 26px;
+  height: 18px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.metro-logo {
+  position: relative;
+  width: 34px;
+  height: 18px;
+}
+
+.metro-logo::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 1px;
+  width: 14px;
+  height: 14px;
+  background: white;
+  border: 3px solid #c62828;
+  transform: rotate(45deg);
+  box-sizing: border-box;
+  z-index: 1;
+}
+
+.metro-logo::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  width: 30px;
+  height: 6px;
+  background: #1565c0;
+  border-radius: 2px;
+  z-index: 2;
+}
+
+.poi-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 7px rgba(0,0,0,0.25);
+  border: 2px solid white;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.poi-emoji-icon {
+  background: white;
+}
+
+.poi-places { background: #cc6600; }
+.poi-monuments { background: #6a1b9a; }
+.poi-musees { background: #0066cc; }
+.poi-parcs { background: #2e7d32; }
+.poi-activites { background: #795548; }
+.poi-shopping { background: #616161; }
+
+@media (max-width: 900px) {
+  #app {
+    flex-direction: column;
   }
 
-  const text = await response.text();
+  #sidebar {
+    width: 100%;
+    max-width: none;
+    min-width: auto;
+    height: 42vh;
+  }
 
-  try {
-    return JSON.parse(text.replace(/^\uFEFF/, ""));
-  } catch (e) {
-    console.error("JSON invalide :", finalUrl);
-    console.error(text.slice(-500));
-    throw e;
+  #map-wrap {
+    height: 58vh;
   }
 }
 
-async function initializeData() {
-  const entries = Object.entries(DATA_URLS);
+.metro-emoji-icon {
+  font-size: 22px;
+  line-height: 1;
+  text-align: center;
+}
 
-  const results = await Promise.allSettled(
-    entries.map(([key, url]) => loadGeoJSON(url))
-  );
+.metro-emoji-small {
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.7;
+}
 
-  let loadedCount = 0;
-  let failed = [];
+.metro-lines-panel {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #eee5d8;
+}
 
-  results.forEach((result, index) => {
-    const key = entries[index][0];
+.metro-lines-panel h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
 
-    if (result.status === "fulfilled") {
-      rawData[key] = result.value;
-      loadedCount++;
-    } else {
-      console.error(`Échec chargement ${key}:`, result.reason);
-      failed.push(key);
-    }
-  });
+.metro-line-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 6px 4px 0;
+}
 
-  console.log(`Couches chargées : ${loadedCount}/${entries.length}`);
+.metro-chip {
+  display: inline-block;
+  min-width: 38px;
+  text-align: center;
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+}
 
-  if (!loadedCount) {
-    setResultsHtml("<p>Impossible de charger les données de la carte.</p>");
-    return;
+.metro-L1  { background: #79c7df; }
+.metro-L2  { background: #ef3340; }
+.metro-L3  { background: #ffd100; color: #0b4ea2; }
+.metro-L4  { background: #d17c00; }
+.metro-L5  { background: #a4c614; }
+.metro-L6  { background: #bdb7ad; }
+.metro-L7  { background: #f0a202; }
+.metro-L8  { background: #e7a6c9; }
+.metro-L9  { background: #a639a7; }
+.metro-L10 { background: #0057b8; }
+.metro-L11 { background: #009b3a; }
+.metro-L12 { background: #b5a100; }
+.metro-R { background: #000000; }
+
+#mobileMenuHandle {
+  display: none;
+}
+
+#mobileOverlay {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  #app {
+    position: relative;
+    display: block;
+    height: 100vh;
+    overflow: hidden;
   }
 
-  createCategoryLayers();
-  createStationsLayer();
-  setupLayerControls();
-  updateStationStyleByZoom();
-
-  if (layers.stations && layers.stations.getBounds && layers.stations.getBounds().isValid()) {
-    map.fitBounds(layers.stations.getBounds(), { padding: [30, 30] });
+  #map-wrap {
+    height: 100vh;
   }
 
-  if (failed.length) {
-    console.warn("Certaines couches n'ont pas pu être chargées :", failed.join(", "));
-    setResultsHtml(
-      `<p>Carte chargée partiellement. Couches indisponibles : ${failed.join(", ")}</p>`
-    );
+  #sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: min(86vw, 360px);
+    height: 100vh;
+    z-index: 2000;
+    transform: translateX(-100%);
+    transition: transform 0.28s ease;
+    box-shadow: 8px 0 24px rgba(0,0,0,0.18);
+    border-right: 1px solid #e3ddd2;
+  }
+
+  #sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  #mobileOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.28);
+    z-index: 1900;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  #mobileOverlay.active {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  #mobileMenuHandle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 2100;
+    border: none;
+    border-radius: 999px;
+    padding: 10px 14px;
+    background: white;
+    color: #2f2a24;
+    box-shadow: 0 3px 14px rgba(0,0,0,0.18);
+    font-weight: 700;
+    cursor: pointer;
   }
 }
 
-function createCategoryLayers() {
-  ["places", "monuments", "musees", "parcs", "activites", "shopping"].forEach(category => {
-    if (!rawData[category]) return;
-
-    layers[category] = L.geoJSON(rawData[category], {
-      pointToLayer: (feature, latlng) => {
-        return L.marker(latlng, {
-          icon: categoryIconMap[category]()
-        });
-      },
-
-      style: (feature) => {
-        const color = getCategoryColor(category);
-        const type = feature?.geometry?.type;
-
-        if (type === "LineString" || type === "MultiLineString") {
-          return {
-            color: color,
-            weight: 4,
-            opacity: 0.9
-          };
-        }
-
-        if (type === "Polygon" || type === "MultiPolygon") {
-          return {
-            color: color,
-            weight: 2,
-            opacity: 0.9,
-            fillColor: color,
-            fillOpacity: 0.15
-          };
-        }
-
-        return {
-          color: color,
-          weight: 2
-        };
-      },
-
-      onEachFeature: (feature, layer) => {
-        layer.bindPopup(buildPopup(feature, category));
-      }
-    });
-
-if (document.querySelector(`input[data-layer="${category}"]`)?.checked) {
-  layers[category].addTo(map);
+#map-wrap {
+  flex: 1;
+  position: relative;
+  min-width: 0;
 }
 
-    console.log(`Couche ${category} créée :`, layers[category]);
-  });
+#fullscreenMapBtn {
+  position: absolute;
+  top: 70px;
+  right: 10px;
+  z-index: 99999; /* très important */
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #2f2a24;
+  font-size: 22px;
+  cursor: pointer;
+  box-shadow: 0 3px 14px rgba(0,0,0,0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-function createStationsLayer() {
-  if (!rawData.stations) return;
-
-  layers.stations = L.geoJSON(rawData.stations, {
-    pointToLayer: (feature, latlng) => {
-      const marker = L.marker(latlng, {
-       icon: createMetroStationIcon(getFeatureTitle(feature), false)
-      });
-
-      const stationTitle = getFeatureTitle(feature);
-      const lineCodes = parseStationLines(feature);
-      const linesText = lineCodes.length ? lineCodes.join(", ") : "—";
-
-      marker.bindPopup(`
-        <div>
-          <strong>${escapeHtml(stationTitle)}</strong>
-          <br>Lignes : ${escapeHtml(linesText)}
-        </div>
-      `);
-
-      marker.on("click", () => {
-        
-        showMetroLines(lineCodes);
-        marker.openPopup();
-      });
-      return marker;
-    }
- }).addTo(map);
-
-  console.log("Stations layer créée :", layers.stations);
+#fullscreenMapBtn:hover {
+  background: white;
 }
 
-function updateStationStyleByZoom() {
-  if (!layers.stations) return;
-
-  const zoom = map.getZoom();
-
-  layers.stations.eachLayer(layer => {
-    if (!layer.feature || !layer.setIcon) return;
-
-    const stationName = getFeatureTitle(layer.feature);
-
-    if (zoom < 15) {
-      layer.setIcon(createMetroPointIcon());
-    } else {
-      const showLabel = zoom >= 16;
-      layer.setIcon(createMetroStationIcon(stationName, showLabel));
-    }
-  });
+#map-wrap:fullscreen {
+  width: 100vw;
+  height: 100vh;
 }
 
-map.on("zoomend", () => {
-  if (layers.stations) {
-    updateStationStyleByZoom();
-  }
-});
-
-// =========================
-// 9) AFFICHAGE DES LIGNES METRO
-
-function showMetroLines(lineCodes) {
-  if (!rawData.lignes || !rawData.lignes.features) return;
-
-  lineCodes.forEach(lineCode => {
-    if (visibleMetroLines.has(lineCode)) return;
-
-   const matchedFeatures = rawData.lignes.features.filter(feature =>
-  featureMatchesLine(feature, lineCode)
-);
-
-    if (!matchedFeatures.length) {
-      console.warn("Aucune ligne trouvée pour :", lineCode);
-      return;
-    }
-
-    const layer = L.geoJSON(
-      {
-        type: "FeatureCollection",
-        features: matchedFeatures
-      },
-      {
-        style: () => ({
-          color: getLineColor(lineCode),
-          weight: 5,
-          opacity: 0.95
-        })
-      }
-    ).addTo(map);
-
-    visibleMetroLines.set(lineCode, layer);
-  });
+#map-wrap:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
 }
 
-// =========================
-// 11) CALCULS DE PROXIMITE
-// =========================
-function getAllPOIFeatures() {
-  return [
-    ...(rawData.places?.features || []).map(f => ({ ...f, __category: "places" })),
-    ...(rawData.monuments?.features || []).map(f => ({ ...f, __category: "monuments" })),
-    ...(rawData.musees?.features || []).map(f => ({ ...f, __category: "musees" })),
-    ...(rawData.parcs?.features || []).map(f => ({ ...f, __category: "parcs" })),
-    ...(rawData.activites?.features || []).map(f => ({ ...f, __category: "activites" })),
-    ...(rawData.shopping?.features || []).map(f => ({ ...f, __category: "shopping" }))
-  ];
+#app:fullscreen,
+#app:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
 }
 
-function findNearestStation(targetLatLng) {
-  let nearest = null;
-  let minDistance = Infinity;
-
-  (rawData.stations?.features || []).forEach(feature => {
-    const stationLatLng = getLatLngFromFeature(feature);
-    if (!stationLatLng) return;
-
-    const distance = haversineDistanceMeters(targetLatLng, stationLatLng);
-
-    if (distance < minDistance) {
-      minDistance = distance;
-      nearest = { feature, distance };
-    }
-  });
-
-  return nearest;
+#app:fullscreen #map-wrap,
+#app:-webkit-full-screen #map-wrap {
+  height: 100%;
 }
 
-function findNearbyPOIs(targetLatLng, radiusMeters = SEARCH_RADIUS_METERS) {
-  const pois = getAllPOIFeatures();
-
-  return pois
-    .map(feature => {
-      const latlng = getLatLngFromFeature(feature);
-      if (!latlng) return null;
-
-      const distance = haversineDistanceMeters(targetLatLng, latlng);
-      return { feature, distance };
-    })
-    .filter(item => item && item.distance <= radiusMeters)
-    .sort((a, b) => a.distance - b.distance);
+.metro-station-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
 }
 
-function renderSearchResults(title, targetLatLng) {
-  const nearestStation = findNearestStation(targetLatLng);
-  const nearbyPOIs = findNearbyPOIs(targetLatLng);
-
-  let stationHtml = `<p>Aucune station trouvée.</p>`;
-
-  if (nearestStation) {
-    const stationTitle = getFeatureTitle(nearestStation.feature);
-    const distance = getEstimatedWalkingDistance(nearestStation.distance);
-    const minutes = getEstimatedWalkingMinutes(nearestStation.distance);
-
-    stationHtml = `
-      <div class="result-block">
-        <h3>Station de métro la plus proche</h3>
-        <p><strong>${escapeHtml(stationTitle)}</strong></p>
-        <p>${distance} m — ${minutes} min à pied</p>
-      </div>
-    `;
-  }
-
-  let poiHtml = `
-    <div class="result-block">
-      <h3>Lieux d’intérêt à moins de ${SEARCH_RADIUS_METERS} m</h3>
-      <p>Aucun lieu trouvé dans ce rayon.</p>
-    </div>
-  `;
-
-  if (nearbyPOIs.length) {
-    const items = nearbyPOIs.map(item => {
-      const poiTitle = getFeatureTitle(item.feature);
-      const distance = getEstimatedWalkingDistance(item.distance);
-      const minutes = getEstimatedWalkingMinutes(item.distance);
-      return `<li>${escapeHtml(poiTitle)} — ${distance} m — ${minutes} min</li>`;
-    }).join("");
-
-    poiHtml = `
-      <div class="result-block">
-        <h3>Lieux d’intérêt à moins de ${SEARCH_RADIUS_METERS} m</h3>
-        <ul class="poi-list">${items}</ul>
-      </div>
-    `;
-  }
-
-  setResultsHtml(`
-    <div class="result-block">
-      <h3>Lieu recherché</h3>
-      <p><strong>${escapeHtml(title)}</strong></p>
-    </div>
-    ${stationHtml}
-    ${poiHtml}
-  `);
+.metro-station-logo {
+  width: 18px;
+  height: auto;
+  display: block;
 }
 
-// =========================
-// 12) RECHERCHE NOMINATIM
-// =========================
-async function geocodeWithNominatim(query) {
-  const key = query.trim().toLowerCase();
-
-  if (geocodeCache.has(key)) {
-    return geocodeCache.get(key);
-  }
-
-  const finalQuery = `${query}, Madrid, Spain`;
-
-  const url = new URL("https://nominatim.openstreetmap.org/search");
-  url.searchParams.set("format", "jsonv2");
-  url.searchParams.set("limit", "5");
-  url.searchParams.set("countrycodes", "es");
-  url.searchParams.set("q", finalQuery);
-  url.searchParams.set("accept-language", "fr");
-  url.searchParams.set("addressdetails", "1");
-
-  console.log("URL Nominatim :", url.toString());
-
-  const response = await fetch(url.toString(), {
-    headers: {
-      "Accept": "application/json"
-    }
-  });
-
-  console.log("Status Nominatim :", response.status);
-
-  if (!response.ok) {
-    throw new Error(`Erreur Nominatim (${response.status})`);
-  }
-
-  const data = await response.json();
-  geocodeCache.set(key, data);
-  return data;
-}
-function chooseBestResult(results) {
-  if (!results.length) return null;
-
-  const madridResult = results.find(r =>
-    (r.display_name || "").toLowerCase().includes("madrid")
-  );
-
-  return madridResult || results[0];
-}
-function setResultsHtml(html) {
-  const el = document.getElementById("resultsContent");
-  if (el) {
-    el.innerHTML = html;
-  } else {
-    console.warn("resultsContent introuvable");
-  }
+.metro-station-label {
+  margin-top: 2px;
+  padding: 1px 5px;
+  background: rgba(255,255,255,0.9);
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #222;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
 }
 
-async function runSearch() {
-  console.log("runSearch déclenchée");
-
-  const input = document.getElementById("searchInput");
-  if (!input) {
-    console.error("Champ #searchInput introuvable");
-    return;
-  }
-
-  const query = input.value.trim();
-  console.log("Recherche :", query);
-
-  if (!query) {
-    setResultsHtml("<p>Veuillez entrer le nom ou l’adresse de votre hébergement.</p>");
-    return;
-  }
-
-  if (!canSearchNow()) {
-    setResultsHtml("<p>Merci d’attendre une seconde avant une nouvelle recherche.</p>");
-    return;
-  }
-
-  setResultsHtml("<p>Recherche en cours…</p>");
-
-  try {
-    const results = await geocodeWithNominatim(query);
-    console.log("Résultats Nominatim :", results);
-
-    if (!results || !results.length) {
-      setResultsHtml("<p>Aucun résultat trouvé. Essayez avec le nom complet de l’hôtel ou une adresse plus précise.</p>");
-      return;
-    }
-
-    const best = chooseBestResult(results);
-    const lat = parseFloat(best.lat);
-    const lon = parseFloat(best.lon);
-    const latlng = L.latLng(lat, lon);
-
-    clearTemporarySearchGraphics();
-
-    temporarySearchMarker = L.marker(latlng).addTo(map);
-    temporarySearchCircle = L.circle(latlng, {
-      radius: SEARCH_RADIUS_METERS,
-      color: "#b85c2e",
-      weight: 2,
-      fillColor: "#b85c2e",
-      fillOpacity: 0.08
-    }).addTo(map);
-
-    map.flyTo(latlng, 15);
-
-    const title = best.display_name || query;
-    temporarySearchMarker.bindPopup(`<strong>${escapeHtml(title)}</strong>`).openPopup();
-
-    renderSearchResults(title, latlng);
-
-  } catch (error) {
-    console.error("Erreur runSearch :", error);
-    setResultsHtml("<p>Erreur lors de la recherche. Réessayez dans quelques secondes.</p>");
-  }
-}
-// =========================
-// 13) GEOLOCALISATION
-// =========================
-map.on("locationfound", (e) => {
-  clearTemporarySearchGraphics();
-
-  temporarySearchMarker = L.marker(e.latlng).addTo(map);
-  temporarySearchCircle = L.circle(e.latlng, {
-    radius: SEARCH_RADIUS_METERS,
-    color: "#1565c0",
-    weight: 2,
-    fillColor: "#1565c0",
-    fillOpacity: 0.08
-  }).addTo(map);
-
-  renderSearchResults("Ma position actuelle", e.latlng);
-});
-
-map.on("locationerror", () => {
-  setResultsHtml("<p>Impossible d’accéder à votre position.</p>");
-});
-
-// =========================
-// 14) BOUTONS ET TOGGLES
-// =========================
-function setupLayerControls() {
-  document.querySelectorAll("input[data-layer]").forEach(input => {
-    input.addEventListener("change", (e) => {
-      const layerName = e.target.dataset.layer;
-      const checked = e.target.checked;
-
-      if (!layers[layerName]) return;
-
-      if (checked) {
-        map.addLayer(layers[layerName]);
-      } else {
-        map.removeLayer(layers[layerName]);
-      }
-    });
-  });
-
-  document.querySelectorAll("input[data-metro-line]").forEach(input => {
-    input.addEventListener("change", (e) => {
-      const lineCode = e.target.dataset.metroLine;
-      const checked = e.target.checked;
-
-      if (checked) {
-        showManualMetroLine(lineCode);
-      } else {
-        hideManualMetroLine(lineCode);
-      }
-    });
-  });
-  
-  const showAllBtn = document.getElementById("showAllBtn");
-  const hideAllBtn = document.getElementById("hideAllBtn");
-  const clearLinesBtn = document.getElementById("clearLinesBtn");
-  const resetMapBtn = document.getElementById("resetMapBtn");
-  const searchBtn = document.getElementById("searchBtn");
-  const searchInput = document.getElementById("searchInput");
-
-  if (showAllBtn) {
-    showAllBtn.addEventListener("click", () => {
-      document.querySelectorAll("input[data-layer]").forEach(input => {
-        input.checked = true;
-        const layerName = input.dataset.layer;
-        if (layers[layerName]) map.addLayer(layers[layerName]);
-      });
-    });
-  }
-
-  if (hideAllBtn) {
-    hideAllBtn.addEventListener("click", () => {
-      document.querySelectorAll("input[data-layer]").forEach(input => {
-        input.checked = false;
-        const layerName = input.dataset.layer;
-        if (layers[layerName]) map.removeLayer(layers[layerName]);
-      });
-    });
-  }
-
-  if (clearLinesBtn) {
-    clearLinesBtn.addEventListener("click", () => {
-      clearMetroLines();
-    });
-  }
-
-  if (resetMapBtn) {
-    resetMapBtn.addEventListener("click", () => {
-      clearMetroLines();
-      clearTemporarySearchGraphics();
-      map.flyTo(MADRID_CENTER, INITIAL_ZOOM);
-      setResultsHtml("<p>Recherchez un hébergement ou utilisez la géolocalisation.</p>");
-    });
-  }
-
-  if (searchBtn) {
-    searchBtn.addEventListener("click", runSearch);
-  }
-
-  if (searchInput) {
-    searchInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") runSearch();
-    });
-  }
+.metro-station-icon {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-// =========================
-// 15) LANCEMENT
-// =========================
-initializeData();
-
-function updateResultsForStation(stationFeature, stationTitle, lineCodes) {
-  const lines = lineCodes.length ? lineCodes.join(", ") : "—";
-
-  document.getElementById("resultsContent").innerHTML = `
-    <div class="result-block">
-      <h3>Station sélectionnée</h3>
-      <p><strong>${stationTitle}</strong></p>
-      <p>Lignes : ${lines}</p>
-    </div>
-  `;
+.metro-station-label {
+  position: absolute;
+  top: 20px; /* sous le logo */
+  left: 50%;
+  transform: translateX(-50%);
 }
 
-function showManualMetroLine(lineCode) {
-  if (!rawData.lignes || !rawData.lignes.features) return;
-  if (manualMetroLines.has(lineCode)) return;
-
- const matchedFeatures = rawData.lignes.features.filter(feature =>
-  featureMatchesLine(feature, lineCode)
-);
-  if (!matchedFeatures.length) {
-    console.warn("Aucune ligne trouvée pour :", lineCode);
-    return;
-  }
-
-  const layer = L.geoJSON(
-    {
-      type: "FeatureCollection",
-      features: matchedFeatures
-    },
-    {
-      style: () => ({
-        color: getLineColor(lineCode),
-        weight: 5,
-        opacity: 0.95
-      })
-    }
-  ).addTo(map);
-
-  manualMetroLines.set(lineCode, layer);
+.itinerary-panel {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #eee5d8;
 }
 
-function hideManualMetroLine(lineCode) {
-  if (!manualMetroLines.has(lineCode)) return;
-  map.removeLayer(manualMetroLines.get(lineCode));
-  manualMetroLines.delete(lineCode);
+.itinerary-panel h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
 }
 
-function featureMatchesLine(feature, lineCode) {
-  const props = feature.properties || {};
-
-  const title = (props.title || "").toString().toUpperCase().trim();
-  const name = (props.name || "").toString().toUpperCase().trim();
-  const code = (props.lineCode || "").toString().toUpperCase().trim();
-  const desc = (props.description || "").toString().toUpperCase().trim();
-
-  if (code === lineCode) return true;
-
-  if (lineCode === "R") {
-    return (
-      code === "R" ||
-      title === "LIGNE R" ||
-      title === "LÍNEA R" ||
-      title === "R" ||
-      name === "LIGNE R" ||
-      name === "LÍNEA R" ||
-      name === "R"
-    );
-  }
-
-  const lineNumber = lineCode.replace("L", "");
-
-  return (
-    title === `LIGNE ${lineNumber}` ||
-    title === `LÍNEA ${lineNumber}` ||
-    name === `LIGNE ${lineNumber}` ||
-    name === `LÍNEA ${lineNumber}` ||
-    title === lineCode ||
-    name === lineCode ||
-    code === lineCode ||
-    desc.includes(lineCode)
-  );
+.itinerary-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 9px 10px;
+  background: #faf7f2;
+  border: 1px solid #e8dfd2;
+  border-radius: 10px;
+  font-size: 14px;
 }
 
-function setupMobileSidebar() {
-  const sidebar = document.getElementById("sidebar");
-  const handle = document.getElementById("mobileMenuHandle");
-  const overlay = document.getElementById("mobileOverlay");
-
-  if (!sidebar || !handle || !overlay) return;
-
-  let startX = 0;
-  let currentX = 0;
-  let touching = false;
-
-  function isMobile() {
-    return window.innerWidth <= 900;
-  }
-
-  function openMenu() {
-    if (!isMobile()) return;
-    sidebar.classList.add("mobile-open");
-    overlay.classList.add("active");
-  }
-
-  function closeMenu() {
-    if (!isMobile()) return;
-    sidebar.classList.remove("mobile-open");
-    overlay.classList.remove("active");
-    sidebar.style.transform = "";
-  }
-
-  handle.addEventListener("click", () => {
-    if (sidebar.classList.contains("mobile-open")) {
-      closeMenu();
-    } else {
-      openMenu();
-    }
-  });
-
-  overlay.addEventListener("click", closeMenu);
-
-  document.addEventListener("touchstart", (e) => {
-    if (!isMobile()) return;
-
-    const touch = e.touches[0];
-    startX = touch.clientX;
-    currentX = touch.clientX;
-
-    const menuOpen = sidebar.classList.contains("mobile-open");
-    const nearLeftEdge = startX < 24;
-    const touchedInsideSidebar = !!e.target.closest("#sidebar");
-
-    if ((!menuOpen && nearLeftEdge) || (menuOpen && touchedInsideSidebar)) {
-      touching = true;
-    } else {
-      touching = false;
-    }
-  }, { passive: true });
-
-  document.addEventListener("touchmove", (e) => {
-    if (!isMobile() || !touching) return;
-
-    const touch = e.touches[0];
-    currentX = touch.clientX;
-
-    const menuOpen = sidebar.classList.contains("mobile-open");
-    const deltaX = currentX - startX;
-    const sidebarWidth = sidebar.offsetWidth;
-
-    if (!menuOpen) {
-      const translate = Math.min(0, -sidebarWidth + Math.max(0, deltaX));
-      sidebar.style.transform = `translateX(${translate}px)`;
-    } else {
-      const translate = Math.min(0, deltaX);
-      sidebar.style.transform = `translateX(${translate}px)`;
-    }
-  }, { passive: true });
-
-  document.addEventListener("touchend", () => {
-    if (!isMobile() || !touching) return;
-
-    const menuOpen = sidebar.classList.contains("mobile-open");
-    const deltaX = currentX - startX;
-
-    sidebar.style.transform = "";
-
-    if (!menuOpen && deltaX > 70) {
-      openMenu();
-    } else if (menuOpen && deltaX < -70) {
-      closeMenu();
-    } else {
-      if (menuOpen) {
-        openMenu();
-      } else {
-        closeMenu();
-      }
-    }
-
-    touching = false;
-  });
-
-  window.addEventListener("resize", () => {
-    if (!isMobile()) {
-      sidebar.classList.remove("mobile-open");
-      overlay.classList.remove("active");
-      sidebar.style.transform = "";
-    }
-  });
+.add-itinerary-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  border: none;
+  border-radius: 999px;
+  background: #b85c2e;
+  color: white;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  font-weight: 700;
 }
 
-setupMobileSidebar();
-
-const fullscreenMapBtn = document.getElementById("fullscreenMapBtn");
-const app = document.getElementById("app");
-
-if (fullscreenMapBtn && app) {
-  fullscreenMapBtn.addEventListener("click", async () => {
-    try {
-      if (!document.fullscreenElement) {
-        await app.requestFullscreen();
-      } else {
-        await document.exitFullscreen();
-      }
-    } catch (error) {
-      console.error("Erreur plein écran :", error);
-    }
-  });
-
-  document.addEventListener("fullscreenchange", () => {
-    fullscreenMapBtn.textContent = document.fullscreenElement ? "✕" : "⛶";
-
-    setTimeout(() => {
-      if (typeof map !== "undefined" && map.invalidateSize) {
-        map.invalidateSize();
-      }
-    }, 200);
-  });
+.itinerary-popup-card {
+  position: relative;
+  padding-top: 24px;
 }
 
-function createMetroPointIcon() {
-  return L.divIcon({
-    className: "",
-    html: `<div class="custom-metro-point"></div>`,
-    iconSize: [8, 8],
-    iconAnchor: [4, 4],
-    popupAnchor: [0, -6]
-  });
+.itinerary-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2f2a24;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 999px;
+  z-index: 999999;
+  font-size: 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+}
+.delete-itinerary-btn {
+  border: none;
+  background: transparent;
+  color: #b85c2e;
+  font-size: 16px;
+  cursor: pointer;
+  font-weight: bold;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.delete-itinerary-btn:hover {
+  background: rgba(184,92,46,0.1);
 }
