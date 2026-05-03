@@ -463,3 +463,73 @@ html, body {
   left: 50%;
   transform: translateX(-50%);
 }
+
+.itinerary-panel {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #eee5d8;
+}
+
+.itinerary-panel h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.itinerary-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 9px 10px;
+  background: #faf7f2;
+  border: 1px solid #e8dfd2;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.add-itinerary-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  border: none;
+  border-radius: 999px;
+  background: #b85c2e;
+  color: white;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.itinerary-popup-card {
+  position: relative;
+  padding-top: 24px;
+}
+
+.itinerary-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2f2a24;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 999px;
+  z-index: 999999;
+  font-size: 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+}
+.delete-itinerary-btn {
+  border: none;
+  background: transparent;
+  color: #b85c2e;
+  font-size: 16px;
+  cursor: pointer;
+  font-weight: bold;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.delete-itinerary-btn:hover {
+  background: rgba(184,92,46,0.1);
+}
