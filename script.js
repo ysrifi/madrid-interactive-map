@@ -499,8 +499,7 @@ function updateStationStyleByZoom() {
     if (zoom < 15) {
       layer.setIcon(createMetroPointIcon());
     } else {
-      const showLabel = zoom >= 16;
-      layer.setIcon(createMetroStationIcon(stationName, showLabel));
+      layer.setIcon(createMetroStationIcon(stationName, true));
     }
   });
 }
