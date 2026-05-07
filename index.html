@@ -39,6 +39,20 @@
       </div>
       <small>Ex. : Puerta del Sol, Hotel Regina Madrid ou adresse complète</small>
     </div>
+    <div class="auth-panel">
+  <h3>👤 Mon compte</h3>
+
+  <input id="authEmail" type="email" placeholder="Email">
+  <input id="authPassword" type="password" placeholder="Mot de passe">
+
+  <div class="auth-actions">
+    <button id="signupBtn" type="button">Créer un compte</button>
+    <button id="loginBtn" type="button">Connexion</button>
+    <button id="logoutBtn" type="button">Déconnexion</button>
+  </div>
+
+  <p id="authStatus">Non connecté</p>
+</div>
     
     <div class="layer-section">
       <h2>Catégories</h2>
@@ -122,6 +136,7 @@
     <div id="map"></div>
   </main>
 </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js"></script>
 </body>
 </html>
