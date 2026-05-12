@@ -578,3 +578,48 @@ html, body {
     top: 58px;
   }
 }
+
+#premiumGuideBtn {
+  position: relative;
+  background: linear-gradient(135deg, #b85c2e, #d89b3d);
+}
+
+#premiumGuideBtn::after {
+  content: "Organisez vos journées avec le guide, puis déplacez-vous facilement grâce à la carte interactive.";
+  position: absolute;
+
+  top: calc(100% + 8px); /* sous le bouton */
+  left: 0;
+
+  width: 100%;
+  max-width: 100%;
+
+  box-sizing: border-box;
+
+  background: rgba(47, 42, 36, 0.96);
+  color: white;
+
+  padding: 8px 10px;
+
+  border-radius: 10px;
+
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+
+  text-align: left;
+
+  opacity: 0;
+  pointer-events: none;
+
+  transition: opacity 0.18s ease;
+
+  z-index: 999999;
+
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+}
+
+#premiumGuideBtn:hover::after,
+#premiumGuideBtn.tooltip-visible::after {
+  opacity: 0.8;
+}
