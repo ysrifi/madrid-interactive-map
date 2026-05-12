@@ -361,7 +361,7 @@ html, body {
     align-items: center;
     gap: 8px;
     position: fixed;
-    top: 72px;
+    top: 14px;
     left: 14px;
     z-index: 2100;
     border: none;
@@ -571,4 +571,10 @@ html, body {
 #authStatus {
   font-size: 13px;
   color: #6f675b;
+}
+
+@media (max-width: 900px) {
+  .leaflet-top.leaflet-left {
+    top: 58px;
+  }
 }
