@@ -1466,3 +1466,30 @@ async function loadCloudItineraries() {
   renderItineraryList();
 }
 initAuth();
+
+const premiumGuideBtn = document.getElementById("premiumGuideBtn");
+
+const GUMROAD_GUIDE_URL = "https://younescribe4.gumroad.com/l/madrid-sans-perdre-de-temps";
+
+if (premiumGuideBtn) {
+  let premiumTooltipShown = false;
+
+  premiumGuideBtn.addEventListener("click", (e) => {
+    const isMobile = window.innerWidth <= 900;
+
+    if (isMobile && !premiumTooltipShown) {
+      e.preventDefault();
+      premiumTooltipShown = true;
+      premiumGuideBtn.classList.add("tooltip-visible");
+
+      setTimeout(() => {
+        premiumTooltipShown = false;
+        premiumGuideBtn.classList.remove("tooltip-visible");
+      }, 3500);
+
+      return;
+    }
+
+    window.open(GUMROAD_GUIDE_URL, "_blank", "noopener,noreferrer");
+  });
+}
