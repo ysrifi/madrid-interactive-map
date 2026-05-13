@@ -1104,7 +1104,7 @@ if (fullscreenMapBtn && app) {
   fullscreenMapBtn.addEventListener("click", async () => {
     try {
       if (!document.fullscreenElement) {
-        await app.requestFullscreen();
+        await document.documentElement.requestFullscreen();
       } else {
         await document.exitFullscreen();
       }
